@@ -81,7 +81,7 @@ This project is a web application that integrates with Google services to extrac
 
 ### Usage
 
-1. **Open your browser and navigate to**: `http://localhost:3000`
+1. **Open your browser and navigate to**: `http://localhost:5173`
 2. **Sign up or log in using your Google account**.
 3. **View and manage your events** extracted from starred emails.
 
@@ -111,4 +111,4 @@ If you would like to contribute, please fork the repository and submit a pull re
 
 ### Contact
 
-For any inquiries, please contact [yourname](mailto:youremail@example.com).
+For any inquiries, please contact [Sai Narasimha](sainarasimhasomesula@gmail.com).
