@@ -17,8 +17,14 @@ const app = express();
 const port = 3000;
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const impEvents = [];
+let userDetails = [];
 let oauth2Client = {}
-app.use(cors()); // Enable CORS for all routes
+
+app.use(cors({
+    origin: 'http://localhost:5173', 
+    credentials: true, // Allow credentials (cookies) to be sent
+  }));
+  
 
 app.use(bodyParser.json());
 
@@ -29,6 +35,10 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    cookie: {
+        secure: false, 
+        httpOnly: false, // Allows the client to access the cookie
+      },
 }));
 
 app.use(passport.initialize());
@@ -44,9 +54,9 @@ const db = new pg.Client({
 
 db.connect();
 
-app.get('/', (req, res) => {
-    res.render('index.ejs');
-});
+// app.get('/', (req, res) => {
+//     res.render('index.ejs');
+// });
 
 app.get('/auth/google-signin', passport.authenticate('google-signin', {
     scope: ['profile', 'email', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'],
@@ -72,6 +82,39 @@ app.get('/auth/google/Email2Event2', passport.authenticate('google-signup', {
     res.redirect('/starred');
 });
 
+const ensureAuthenticated = (req, res, next) => {
+    if (req.isAuthenticated()) {
+      return next();
+    }
+    res.redirect('/');
+  };
+  
+  app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+  });
+  
+  app.get('/events', ensureAuthenticated, (req, res) => {
+    res.json({ events: impEvents,userDetails: userDetails });
+  });
+  
+  app.get('/logout', (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        console.error('Error logging out:', err);
+        return res.status(500).send('Failed to log out');
+      }
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Error destroying session:', err);
+          return res.status(500).send('Failed to destroy session');
+        }
+        res.clearCookie('connect.sid'); // Clear the session cookie
+        res.status(200).send('Logged out'); 
+      });
+    });
+  });
+    
 app.get('/starred', async (req, res) => {
     try {
         if (!req.user || !req.user.tokens) {
@@ -80,6 +123,7 @@ app.get('/starred', async (req, res) => {
         }
 
         const { accessToken, refreshToken } = req.user.tokens;
+
         // Setup OAuth2 client
         oauth2Client = new google.auth.OAuth2();
         oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
@@ -132,32 +176,26 @@ ${emailBody}`;
             retrievedMessages.push(formattedMessage);
         }
 
-        const batchSize = 4; // Define the batch size
+        const batchSize = 4; // batch size
         for (let i = 0; i < retrievedMessages.length; i += batchSize) {
             const batch = retrievedMessages.slice(i, i + batchSize);
             const events = await parseEventDetailsUsingGemini(batch);
-            console.log(events);
+            //console.log(events);
             for (const event of events) {
                 if (event) {
-                    console.log(event);
-                    event.id = Date.now();
+                    //console.log(event);
+                    event.id = Date.now() + event.summary.length;
                     impEvents.push(event);
                 }
             }
         }
 
-        //res.send("Starred msgs received succesfully"); // Send the messages to the client for now
-        res.redirect("/events");
+        res.redirect("http://localhost:5173/eventTable");
 
     } catch (error) {
         console.error('Error retrieving starred messages:', error);
         res.status(500).send('Error retrieving starred messages');
     }
-});
-
-app.get('/events', (req, res) => {
-  //const {accessToken, refreshToken} = req.user.tokens
-  res.json({events: impEvents});
 });
 
 app.post('/addevent', async (req, res) => {
@@ -185,12 +223,12 @@ app.post('/addevent', async (req, res) => {
   }
 });
 
-// Function to parse event details using NLP
+// Function to parse event details using Gemini
 async function parseEventDetailsUsingGemini(messages) {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // Construct the prompt
+        // the prompt
         const prompt = `
           Analyze the following emails carefully to extract the event details. 
 
@@ -230,9 +268,8 @@ async function parseEventDetailsUsingGemini(messages) {
 
         const cleanText = text.replace(/```json\n|```/g, '').trim();
         const eventDetails = JSON.parse(cleanText);
-        console.log(eventDetails);
-        //return(eventDetails)
-        return eventDetails.filter(event => event && event.summary &&  event.start.dateTime && event.end.dateTime);
+        //console.log(eventDetails);
+        return eventDetails.filter(event => event && event.summary && ( event.start || event.end));
     } catch (error) {
         console.error('Error parsing event details:', error);
         return [];
@@ -276,45 +313,6 @@ function getHeader(headers, name) {
     return header ? header.value : '';
 }
 
-// passport.use("google-signin", new GoogleStrategy({
-//     clientID: process.env.GOOGLE_CLIENT_ID,
-//     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-//     callbackURL: "http://localhost:3000/auth/google/Email2Event1",
-//     userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
-//     passReqToCallback: true,
-// }, (req, accessToken, refreshToken, profile, done) => {
-//     process.nextTick(() => {
-//         req.session.user = profile;
-//         req.session.tokens = { accessToken, refreshToken };
-
-//         return done(null, { profile, tokens: { accessToken, refreshToken } });
-//     });
-// }));
-
-// passport.use("google-signup", new GoogleStrategy({
-//     clientID: process.env.GOOGLE_CLIENT_ID,
-//     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-//     callbackURL: "http://localhost:3000/auth/google/Email2Event2",
-//     userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
-//     passReqToCallback: true,
-// }, (req, accessToken, refreshToken, profile, done) => {
-//     process.nextTick(async () => {
-//         try {
-//             const query = 'INSERT INTO users (email, access_token, refresh_token) VALUES ($1, $2, $3)';
-//             const values = [profile.emails[0].value, accessToken, refreshToken];
-//             await db.query(query, values);
-
-//             req.session.user = profile;
-//             req.session.tokens = { accessToken, refreshToken };
-
-//             return done(null, { profile, tokens: { accessToken, refreshToken } });
-//         } catch (error) {
-//             console.error('Error inserting user into database:', error);
-//             return done(error);
-//         }
-//     });
-// }));
-
 passport.use("google-signin", new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -324,6 +322,9 @@ passport.use("google-signin", new GoogleStrategy({
     prompt: "consent"
   }, async (accessToken, refreshToken, profile, done) => {
     try {
+        //console.log(profile);
+        const {displayName, email, picture} = profile;
+        userDetails = [displayName, email, picture]
         const user = await db.query("SELECT * FROM users WHERE email = $1", [profile.emails[0].value]);
         if (user.rows.length === 0) {
             return done(null, false, { message: "Please sign up before you login." });
@@ -346,7 +347,8 @@ passport.use("google-signin", new GoogleStrategy({
     prompt: "consent"
   }, async (accessToken, refreshToken, profile, done) => {
     try {
-        console.log("hi");
+        const {displayName, email, picture} = profile;
+        userDetails = [displayName, email, picture]
         const user = await db.query("SELECT * FROM users WHERE email = $1", [profile.emails[0].value]);
         if (user.rows.length > 0) {
             return done(null, false, { message: "User already exists. Please log in." });

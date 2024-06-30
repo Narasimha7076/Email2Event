@@ -1,10 +1,9 @@
 import React from 'react';
 import EventRow from './EventRow';
-import AddEventButton from './AddEventButton';
 
 const EventTable = ({ events, editable, onEdit, onAddEvent, onaddNewEvent }) => {
   return (
-    <div>
+    <div className='bg-gray-300'>
       <table className="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
@@ -17,12 +16,11 @@ const EventTable = ({ events, editable, onEdit, onAddEvent, onaddNewEvent }) => 
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-        {events.map((event, index) => (
+        {events.map((event) => (
         <EventRow key={event.id} event={event} editable={editable[event.id]} onEdit={onEdit} id={event.id} onAddEvent={onAddEvent} />
         ))}
         </tbody>
       </table>
-      <AddEventButton onaddNewEvent={onaddNewEvent} />
     </div>
   );
 };
