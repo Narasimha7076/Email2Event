@@ -30,19 +30,7 @@ This project is a web application that integrates with Google services to extrac
     cd email-to-calendar-event-parser
     ```
 
-2. **Install server dependencies**:
-    ```bash
-    cd server
-    npm install
-    ```
-
-3. **Install client dependencies**:
-    ```bash
-    cd ../client
-    npm install
-    ```
-
-4. **Create a `.env` file in the root directory with the following environment variables**:
+2. **Create a `.env` file in the root directory with the following environment variables**:
     ```env
     GOOGLE_API_KEY=your_google_api_key
     GOOGLE_CLIENT_ID=your_google_client_id
@@ -63,20 +51,6 @@ This project is a web application that integrates with Google services to extrac
         email VARCHAR(255) NOT NULL,
         password VARCHAR(255) NOT NULL
     );
-    ```
-
-### Running the Application
-
-1. **Start the server**:
-    ```bash
-    cd server
-    npm start
-    ```
-
-2. **Start the client**:
-    ```bash
-    cd ../client
-    npm start
     ```
 
 ### Usage
